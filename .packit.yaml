@@ -1,3 +1,42 @@
+specfile_path: tcp-brutal.spec
+upstream_package_name: tcp-brutal
+downstream_package_name: brutalctl
+update_release: false
+use_copr_dist_git_build: false
+
+srpm_build_deps:
+  - bash
+  - git
+  - curl
+  - rpm-build
+  - systemd-rpm-macros
+  - sed
+
+actions:
+  get-current-version:
+    - >-
+      bash -euo pipefail -c 'git show HEAD:tcp-brutal.spec |
+      sed -nE "s/^Version:[[:blank:]]+([^[:space:]]+).*$/\1/p"'
+  create-archive:
+    - |-
+      bash -euo pipefail -c '
+        cd "$(git rev-parse --show-toplevel)"
+        version=$(git show HEAD:tcp-brutal.spec | sed -nE "s/^Version:[[:blank:]]+([^[:space:]]+).*$/\1/p")
+        archive="tcp-brutal-$version.tar.gz"
+        curl --fail --silent --show-error --location --retry 3 \
+          --output "$archive" \
+          "https://github.com/HyNetworks/tcp-brutal/archive/refs/tags/v$version.tar.gz"
+        printf "%s\n" "$archive"
+      '
+  fix-spec-file:
+    - |-
+      bash -euo pipefail -c '
+        cd "$(git rev-parse --show-toplevel)"
+        original=$(git show HEAD:tcp-brutal.spec)
+        version=$(sed -nE "s/^Version:[[:blank:]]+([^[:space:]]+).*$/\1/p" <<< "$original")
+        sed -E "s|^Source0:.*|Source0:        tcp-brutal-$version.tar.gz|" <<< "$original" > tcp-brutal.spec
+      '
+
 jobs:
   - job: copr_build
     trigger: release
